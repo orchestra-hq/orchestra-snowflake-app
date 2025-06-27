@@ -1,0 +1,55 @@
+# Orchestra Snowflake Native App - .gitignore
+
+# Configuration files with sensitive data
+config/*.sql
+!config/template.sql
+
+# API keys and secrets
+*.key
+*.pem
+secrets/
+.env
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Snowflake session files
+*.session
+
+# Backup files
+*.bak
+*.backup
+
+# Documentation build files
+docs/_build/
+site/
+
+# Test files
+test_output/
+coverage/
+
+# Node modules (if any JavaScript tooling is added)
+node_modules/
+npm-debug.log*
+
+# Python (if any Python scripts are added)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/ 
