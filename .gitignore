@@ -53,3 +53,7 @@ __pycache__/
 env/
 venv/
 .venv/ 
+
+# Snowflake
+snowflake.local.yml
+output/**
