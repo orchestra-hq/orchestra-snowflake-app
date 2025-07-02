@@ -8,12 +8,28 @@ This Snowflake Native Application allows you to pull data from the Orchestra API
 - **Secure**: API keys are handled securely through Snowflake secrets
 - **Easy to Use**: Simple stored procedures for data access
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
+### Required Database and Schema
+
+**IMPORTANT**: Before installing this app, you must create the following database and schema:
+
+```sql
+-- Create the required database
+CREATE DATABASE IF NOT EXISTS ORCHESTRA_DATA;
+
+-- Create the required schema
+CREATE SCHEMA IF NOT EXISTS ORCHESTRA_DATA.PUBLIC;
+```
+
+The app will automatically create tables in the `ORCHESTRA_DATA.PUBLIC` schema when you run the setup procedures.
+
+### Other Prerequisites
 
 - Snowflake account with appropriate privileges
 - Orchestra API key from [https://app.getorchestra.io/settings/api-key](https://app.getorchestra.io/settings/api-key)
+
+## Getting Started
 
 ### Installation
 
@@ -23,12 +39,17 @@ This Snowflake Native Application allows you to pull data from the Orchestra API
 
 ### Setup
 
-After installation, run the following to create the API access objects:
+After installation, run the following to create the API access objects and tables:
 
 ```sql
 -- Create the EAI objects (run this after granting the reference)
 CALL core.create_eai_objects();
+
+-- Create the output tables in ORCHESTRA_DATA.PUBLIC schema
+CALL core.create_output_tables();
 ```
+
+**Note**: The `create_output_tables()` procedure will validate that the `ORCHESTRA_DATA` database and `PUBLIC` schema exist before creating tables. If they don't exist, you'll get a clear error message.
 
 ## Usage
 
@@ -47,84 +68,22 @@ SELECT core.get_operations('your-api-key');
 
 ### Load Data into Tables
 
+The app automatically creates the following tables in the `ORCHESTRA_DATA.PUBLIC` schema:
+
+- `pipeline_runs` - Stores pipeline run metadata
+- `task_runs` - Stores task run metadata
+- `operations` - Stores operation metadata
+
+To load data into these tables:
+
 ```sql
--- Create a table to store pipeline runs
-CREATE TABLE pipeline_runs (
-    id STRING,
-    pipeline_id STRING,
-    pipeline_name STRING,
-    account_id STRING,
-    env_id STRING,
-    env_name STRING,
-    run_status STRING,
-    triggered_by VARIANT,
-    child_pipeline_runs VARIANT,
-    message STRING,
-    created_at TIMESTAMP_NTZ,
-    updated_at TIMESTAMP_NTZ,
-    completed_at TIMESTAMP_NTZ,
-    started_at TIMESTAMP_NTZ,
-    branch STRING,
-    commit STRING,
-    pipeline_version_number NUMBER,
-    loaded_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
-);
-
--- Create a table to store task runs
-CREATE TABLE task_runs (
-    id STRING,
-    pipeline_run_id STRING,
-    task_name STRING,
-    task_id STRING,
-    account_id STRING,
-    pipeline_id STRING,
-    integration STRING,
-    integration_job STRING,
-    status STRING,
-    message STRING,
-    external_status STRING,
-    external_message STRING,
-    platform_link STRING,
-    task_parameters VARIANT,
-    run_parameters VARIANT,
-    connection_id STRING,
-    number_of_attempts NUMBER,
-    created_at TIMESTAMP_NTZ,
-    updated_at TIMESTAMP_NTZ,
-    completed_at TIMESTAMP_NTZ,
-    started_at TIMESTAMP_NTZ,
-    loaded_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
-);
-
--- Create a table to store operations
-CREATE TABLE operations (
-    id STRING,
-    account_id STRING,
-    pipeline_run_id STRING,
-    task_run_id STRING,
-    inserted_at TIMESTAMP_NTZ,
-    message STRING,
-    operation_name STRING,
-    operation_status STRING,
-    operation_type STRING,
-    external_status STRING,
-    external_detail STRING,
-    external_id STRING,
-    integration STRING,
-    integration_job STRING,
-    started_at TIMESTAMP_NTZ,
-    completed_at TIMESTAMP_NTZ,
-    dependencies VARIANT,
-    operation_duration FLOAT,
-    rows_affected NUMBER,
-    loaded_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
-);
-
 -- Load pipeline runs data
 CALL core.load_pipeline_runs_to_table('your-api-key', 'pipeline_runs');
 CALL core.load_task_runs_to_table('your-api-key', 'task_runs');
 CALL core.load_operations_to_table('your-api-key', 'operations');
 ```
+
+**Note**: The table names should be just the table name (e.g., 'pipeline_runs'), not the full qualified name, as the procedures automatically target the `ORCHESTRA_DATA.PUBLIC` schema.
 
 ### Extract Specific Fields
 

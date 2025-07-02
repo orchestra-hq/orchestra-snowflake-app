@@ -57,3 +57,4 @@ venv/
 # Snowflake
 snowflake.local.yml
 output/**
+config.sql

@@ -44,9 +44,17 @@ BEGIN
               'type', 'CONFIGURATION',
               'payload', OBJECT_CONSTRUCT(
                   'host_ports', ARRAY_CONSTRUCT('app.getorchestra.io'),
-                  'allowed_secrets', ARRAY_CONSTRUCT('orchestra_api_key')
+                  'allowed_secrets', 'LIST',
+                  'secret_references', ARRAY_CONSTRUCT('ORCHESTRA_API_KEY')
               )
           )::STRING;
+      WHEN 'ORCHESTRA_API_KEY' THEN
+        RETURN OBJECT_CONSTRUCT(
+            'type', 'CONFIGURATION',
+            'payload', OBJECT_CONSTRUCT(
+                'type', 'GENERIC_STRING'
+            )
+        )::STRING;
       ELSE
           RETURN '';
   END CASE;
@@ -68,10 +76,10 @@ BEGIN
   CREATE PROCEDURE IF NOT EXISTS core.get_pipeline_runs(api_key STRING, limit_param INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
-  RUNTIME_VERSION = 3.9
+  RUNTIME_VERSION = 3.12
   IMPORTS=('/module-api/orchestra.py')
   EXTERNAL_ACCESS_INTEGRATIONS = (reference('external_access_reference'))
-  SECRETS = ('orchestra_api_key' = api_key)
+  SECRETS = ('ORCHESTRA_API_KEY' = api_key)
   PACKAGES = ('snowflake-snowpark-python', 'requests')
   HANDLER = 'orchestra.get_pipeline_runs';
 
@@ -79,10 +87,10 @@ BEGIN
   CREATE PROCEDURE IF NOT EXISTS core.get_task_runs(api_key STRING, limit_param INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
-  RUNTIME_VERSION = 3.9
+  RUNTIME_VERSION = 3.12
   IMPORTS=('/module-api/orchestra.py')
   EXTERNAL_ACCESS_INTEGRATIONS = (reference('external_access_reference'))
-  SECRETS = ('orchestra_api_key' = api_key)
+  SECRETS = ('ORCHESTRA_API_KEY' = api_key)
   PACKAGES = ('snowflake-snowpark-python', 'requests')
   HANDLER = 'orchestra.get_task_runs';
 
@@ -90,10 +98,10 @@ BEGIN
   CREATE PROCEDURE IF NOT EXISTS core.get_operations(api_key STRING)
   RETURNS VARIANT
   LANGUAGE PYTHON
-  RUNTIME_VERSION = 3.9
+  RUNTIME_VERSION = 3.12
   IMPORTS=('/module-api/orchestra.py')
   EXTERNAL_ACCESS_INTEGRATIONS = (reference('external_access_reference'))
-  SECRETS = ('orchestra_api_key' = api_key)
+  SECRETS = ('ORCHESTRA_API_KEY' = api_key)
   PACKAGES = ('snowflake-snowpark-python', 'requests')
   HANDLER = 'orchestra.get_operations';
 
@@ -117,12 +125,16 @@ $$
 DECLARE
     pipeline_data VARIANT;
     insert_count INTEGER;
+    full_table_name STRING;
 BEGIN
+    -- Use hardcoded database and schema
+    SET full_table_name = 'ORCHESTRA_DATA.public.' || :target_table;
+    
     -- Get pipeline runs data
     SELECT core.get_pipeline_runs(:api_key, 1000) INTO :pipeline_data;
     
     -- Insert data into target table
-    INSERT INTO IDENTIFIER(:target_table)
+    INSERT INTO IDENTIFIER(:full_table_name)
     SELECT 
         value:id::STRING as id,
         value:pipeline_id::STRING as pipeline_id,
@@ -161,12 +173,16 @@ $$
 DECLARE
     task_data VARIANT;
     insert_count INTEGER;
+    full_table_name STRING;
 BEGIN
+    -- Use hardcoded database and schema
+    SET full_table_name = 'ORCHESTRA_DATA.public.' || :target_table;
+    
     -- Get task runs data
     SELECT core.get_task_runs(:api_key, 1000) INTO :task_data;
     
     -- Insert data into target table
-    INSERT INTO IDENTIFIER(:target_table)
+    INSERT INTO IDENTIFIER(:full_table_name)
     SELECT 
         value:id::STRING as id,
         value:pipeline_run_id::STRING as pipeline_run_id,
@@ -209,12 +225,16 @@ $$
 DECLARE
     operation_data VARIANT;
     insert_count INTEGER;
+    full_table_name STRING;
 BEGIN
+    -- Use hardcoded database and schema
+    SET full_table_name = 'ORCHESTRA_DATA.public.' || :target_table;
+    
     -- Get operations data
     SELECT core.get_operations(:api_key) INTO :operation_data;
     
     -- Insert data into target table
-    INSERT INTO IDENTIFIER(:target_table)
+    INSERT INTO IDENTIFIER(:full_table_name)
     SELECT 
         value:id::STRING as id,
         value:account_id::STRING as account_id,
@@ -246,8 +266,44 @@ $$;
 
 GRANT USAGE ON PROCEDURE core.load_operations_to_table(STRING, STRING) TO APPLICATION ROLE app_public;
 
--- 6. Create tables for storing Orchestra data
-CREATE TABLE IF NOT EXISTS pipeline_runs (
+-- 6. Create validation procedure to check database and schema existence
+CREATE OR REPLACE PROCEDURE core.validate_database_schema()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    db_exists BOOLEAN;
+    schema_exists BOOLEAN;
+BEGIN
+    -- Check if database exists
+    SELECT COUNT(*) > 0 INTO :db_exists 
+    FROM INFORMATION_SCHEMA.DATABASES 
+    WHERE DATABASE_NAME = 'ORCHESTRA_DATA';
+    
+    IF (NOT :db_exists) THEN
+        RETURN 'ERROR: Database ORCHESTRA_DATA does not exist. Please create it before running this app.';
+    END IF;
+    
+    -- Check if schema exists
+    SELECT COUNT(*) > 0 INTO :schema_exists 
+    FROM INFORMATION_SCHEMA.SCHEMATA 
+    WHERE CATALOG_NAME = 'ORCHESTRA_DATA' AND SCHEMA_NAME = 'PUBLIC';
+    
+    IF (NOT :schema_exists) THEN
+        RETURN 'ERROR: Schema ORCHESTRA_DATA.PUBLIC does not exist. Please create it before running this app.';
+    END IF;
+    
+    RETURN 'SUCCESS: Database and schema validation passed.';
+END;
+$$;
+
+GRANT USAGE ON PROCEDURE core.validate_database_schema() TO APPLICATION ROLE app_public;
+
+-- 7. Create tables for storing Orchestra data
+
+-- Create the tables
+CREATE TABLE IF NOT EXISTS public.pipeline_runs (
     id STRING,
     pipeline_id STRING,
     pipeline_name STRING,
@@ -268,7 +324,7 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     loaded_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
-CREATE TABLE IF NOT EXISTS task_runs (
+CREATE TABLE IF NOT EXISTS public.task_runs (
     id STRING,
     pipeline_run_id STRING,
     task_name STRING,
@@ -293,7 +349,7 @@ CREATE TABLE IF NOT EXISTS task_runs (
     loaded_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
-CREATE TABLE IF NOT EXISTS operations (
+CREATE TABLE IF NOT EXISTS public.operations (
     id STRING,
     account_id STRING,
     pipeline_run_id STRING,
@@ -317,11 +373,6 @@ CREATE TABLE IF NOT EXISTS operations (
 );
 
 -- Grant permissions on tables
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE pipeline_runs TO APPLICATION ROLE app_public;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE task_runs TO APPLICATION ROLE app_public;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE operations TO APPLICATION ROLE app_public;
-
--- 7. Create a README for the app
-CREATE OR REPLACE FILE FORMAT core.readme_format TYPE = 'MARKDOWN';
-
--- A detailed explanation can be found at https://docs.snowflake.com/en/developer-guide/native-apps/adding-streamlit 
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.pipeline_runs TO APPLICATION ROLE app_public;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.task_runs TO APPLICATION ROLE app_public;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.operations TO APPLICATION ROLE app_public;
