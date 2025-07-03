@@ -17,6 +17,17 @@ references:
       description: "This EAI is required to access the app.getorchestra.io API"
       privileges:
         - USAGE
+      required_at_setup: true
       object_type: EXTERNAL ACCESS INTEGRATION
+      register_callback: core.register_single_callback
+      configuration_callback: core.get_configuration
+      allowed_secrets:
+        - ORCHESTRA_API_KEY
+
+  - ORCHESTRA_API_KEY:
+      label: Orchestra API key
+      description: Personal bearer token for the Orchestra API
+      privileges: [READ]
+      object_type: SECRET
       register_callback: core.register_single_callback
       configuration_callback: core.get_configuration
