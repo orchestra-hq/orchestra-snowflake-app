@@ -73,7 +73,7 @@ AS
 $$
 BEGIN
   -- Procedure to get pipeline runs from Orchestra API
-  CREATE PROCEDURE IF NOT EXISTS core.get_pipeline_runs()
+  CREATE PROCEDURE IF NOT EXISTS core.get_pipeline_runs(page INT DEFAULT 1, per_page INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
   RUNTIME_VERSION = 3.12
@@ -84,7 +84,7 @@ BEGIN
   HANDLER = 'orchestra.get_pipeline_runs';
 
   -- Procedure to get task runs from Orchestra API
-  CREATE PROCEDURE IF NOT EXISTS core.get_task_runs()
+  CREATE PROCEDURE IF NOT EXISTS core.get_task_runs(page INT DEFAULT 1, per_page INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
   RUNTIME_VERSION = 3.12
@@ -95,7 +95,7 @@ BEGIN
   HANDLER = 'orchestra.get_task_runs';
 
   -- Procedure to get operations from Orchestra API
-  CREATE PROCEDURE IF NOT EXISTS core.get_operations()
+  CREATE PROCEDURE IF NOT EXISTS core.get_operations(page INT DEFAULT 1, per_page INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
   RUNTIME_VERSION = 3.12
@@ -106,9 +106,9 @@ BEGIN
   HANDLER = 'orchestra.get_operations';
 
   -- Grant permissions to all procedures
-  GRANT USAGE ON PROCEDURE core.get_pipeline_runs(INT) TO APPLICATION ROLE app_public;
-  GRANT USAGE ON PROCEDURE core.get_task_runs(INT) TO APPLICATION ROLE app_public;
-  GRANT USAGE ON PROCEDURE core.get_operations() TO APPLICATION ROLE app_public;
+  GRANT USAGE ON PROCEDURE core.get_pipeline_runs(INT, INT) TO APPLICATION ROLE app_public;
+  GRANT USAGE ON PROCEDURE core.get_task_runs(INT, INT) TO APPLICATION ROLE app_public;
+  GRANT USAGE ON PROCEDURE core.get_operations(INT, INT) TO APPLICATION ROLE app_public;
 
   RETURN 'SUCCESS';
 END;	
@@ -117,7 +117,7 @@ $$;
 GRANT USAGE ON PROCEDURE core.create_eai_objects() TO APPLICATION ROLE app_public;
 
 -- 5. Create helper procedures for data loading
-CREATE OR REPLACE PROCEDURE core.load_pipeline_runs_to_table()
+CREATE OR REPLACE PROCEDURE core.load_pipeline_runs()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -156,10 +156,10 @@ BEGIN
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE core.load_pipeline_runs_to_table() TO APPLICATION ROLE app_public;
+GRANT USAGE ON PROCEDURE core.load_pipeline_runs() TO APPLICATION ROLE app_public;
 
 -- Load task runs procedure
-CREATE OR REPLACE PROCEDURE core.load_task_runs_to_table()
+CREATE OR REPLACE PROCEDURE core.load_task_runs()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -196,18 +196,18 @@ BEGIN
         value:completedAt::TIMESTAMP_NTZ as completed_at,
         value:startedAt::TIMESTAMP_NTZ as started_at,
         CURRENT_TIMESTAMP() as loaded_at
-    FROM TABLE(FLATTEN(input => :task_data:task_runs));
+    FROM TABLE(FLATTEN(input => :task_data:results));
     
-    SELECT COUNT(*) INTO :insert_count FROM TABLE(FLATTEN(input => :task_data:task_runs));
+    SELECT COUNT(*) INTO :insert_count FROM TABLE(FLATTEN(input => :task_data:results));
     
     RETURN 'Successfully loaded ' || :insert_count || ' task runs';
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE core.load_task_runs_to_table() TO APPLICATION ROLE app_public;
+GRANT USAGE ON PROCEDURE core.load_task_runs() TO APPLICATION ROLE app_public;
 
 -- Load operations procedure
-CREATE OR REPLACE PROCEDURE core.load_operations_to_table()
+CREATE OR REPLACE PROCEDURE core.load_operations()
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -242,15 +242,15 @@ BEGIN
         value:operationDuration::FLOAT as operation_duration,
         value:rowsAffected::NUMBER as rows_affected,
         CURRENT_TIMESTAMP() as loaded_at
-    FROM TABLE(FLATTEN(input => :operation_data:operations));
+    FROM TABLE(FLATTEN(input => :operation_data:results));
     
-    SELECT COUNT(*) INTO :insert_count FROM TABLE(FLATTEN(input => :operation_data:operations));
+    SELECT COUNT(*) INTO :insert_count FROM TABLE(FLATTEN(input => :operation_data:results));
     
     RETURN 'Successfully loaded ' || :insert_count || ' operations';
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE core.load_operations_to_table() TO APPLICATION ROLE app_public;
+GRANT USAGE ON PROCEDURE core.load_operations() TO APPLICATION ROLE app_public;
 
 -- 6. Create tables for storing Orchestra data
 CREATE TABLE IF NOT EXISTS public.pipeline_runs (

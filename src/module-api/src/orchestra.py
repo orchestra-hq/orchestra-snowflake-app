@@ -1,5 +1,6 @@
-import _snowflake
-import requests
+# ignore type errors for _snowflake and requests as they are installed by snowflake
+import _snowflake  # type: ignore
+import requests  # type: ignore
 from typing import Dict, Any
 
 session = requests.Session()
