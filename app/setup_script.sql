@@ -73,42 +73,42 @@ AS
 $$
 BEGIN
   -- Procedure to get pipeline runs from Orchestra API
-  CREATE PROCEDURE IF NOT EXISTS core.get_pipeline_runs(api_key STRING, limit_param INT DEFAULT 100)
+  CREATE PROCEDURE IF NOT EXISTS core.get_pipeline_runs(limit_param INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
   RUNTIME_VERSION = 3.12
   IMPORTS=('/module-api/orchestra.py')
   EXTERNAL_ACCESS_INTEGRATIONS = (reference('external_access_reference'))
-  SECRETS = ('ORCHESTRA_API_KEY' = api_key)
+  SECRETS = ('API_KEY' = reference('ORCHESTRA_API_KEY'))
   PACKAGES = ('snowflake-snowpark-python', 'requests')
   HANDLER = 'orchestra.get_pipeline_runs';
 
   -- Procedure to get task runs from Orchestra API
-  CREATE PROCEDURE IF NOT EXISTS core.get_task_runs(api_key STRING, limit_param INT DEFAULT 100)
+  CREATE PROCEDURE IF NOT EXISTS core.get_task_runs(limit_param INT DEFAULT 100)
   RETURNS VARIANT
   LANGUAGE PYTHON
   RUNTIME_VERSION = 3.12
   IMPORTS=('/module-api/orchestra.py')
   EXTERNAL_ACCESS_INTEGRATIONS = (reference('external_access_reference'))
-  SECRETS = ('ORCHESTRA_API_KEY' = api_key)
+  SECRETS = ('API_KEY' = reference('ORCHESTRA_API_KEY'))
   PACKAGES = ('snowflake-snowpark-python', 'requests')
   HANDLER = 'orchestra.get_task_runs';
 
   -- Procedure to get operations from Orchestra API
-  CREATE PROCEDURE IF NOT EXISTS core.get_operations(api_key STRING)
+  CREATE PROCEDURE IF NOT EXISTS core.get_operations()
   RETURNS VARIANT
   LANGUAGE PYTHON
   RUNTIME_VERSION = 3.12
   IMPORTS=('/module-api/orchestra.py')
   EXTERNAL_ACCESS_INTEGRATIONS = (reference('external_access_reference'))
-  SECRETS = ('ORCHESTRA_API_KEY' = api_key)
+  SECRETS = ('API_KEY' = reference('ORCHESTRA_API_KEY'))
   PACKAGES = ('snowflake-snowpark-python', 'requests')
   HANDLER = 'orchestra.get_operations';
 
   -- Grant permissions to all procedures
-  GRANT USAGE ON PROCEDURE core.get_pipeline_runs(STRING, INT) TO APPLICATION ROLE app_public;
-  GRANT USAGE ON PROCEDURE core.get_task_runs(STRING, INT) TO APPLICATION ROLE app_public;
-  GRANT USAGE ON PROCEDURE core.get_operations(STRING) TO APPLICATION ROLE app_public;
+  GRANT USAGE ON PROCEDURE core.get_pipeline_runs(INT) TO APPLICATION ROLE app_public;
+  GRANT USAGE ON PROCEDURE core.get_task_runs(INT) TO APPLICATION ROLE app_public;
+  GRANT USAGE ON PROCEDURE core.get_operations() TO APPLICATION ROLE app_public;
 
   RETURN 'SUCCESS';
 END;	
@@ -117,7 +117,7 @@ $$;
 GRANT USAGE ON PROCEDURE core.create_eai_objects() TO APPLICATION ROLE app_public;
 
 -- 5. Create helper procedures for data loading
-CREATE OR REPLACE PROCEDURE core.load_pipeline_runs_to_table(api_key STRING, target_table STRING)
+CREATE OR REPLACE PROCEDURE core.load_pipeline_runs_to_table(target_table STRING)
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -128,10 +128,10 @@ DECLARE
     full_table_name STRING;
 BEGIN
     -- Use hardcoded database and schema
-    SET full_table_name = 'ORCHESTRA_DATA.public.' || :target_table;
+    full_table_name := 'ORCHESTRA_DATA.public.' || :target_table;
     
     -- Get pipeline runs data
-    SELECT core.get_pipeline_runs(:api_key, 1000) INTO :pipeline_data;
+    SELECT core.get_pipeline_runs(1000) INTO :pipeline_data;
     
     -- Insert data into target table
     INSERT INTO IDENTIFIER(:full_table_name)
@@ -162,10 +162,10 @@ BEGIN
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE core.load_pipeline_runs_to_table(STRING, STRING) TO APPLICATION ROLE app_public;
+GRANT USAGE ON PROCEDURE core.load_pipeline_runs_to_table(STRING) TO APPLICATION ROLE app_public;
 
 -- Load task runs procedure
-CREATE OR REPLACE PROCEDURE core.load_task_runs_to_table(api_key STRING, target_table STRING)
+CREATE OR REPLACE PROCEDURE core.load_task_runs_to_table(target_table STRING)
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -179,7 +179,7 @@ BEGIN
     SET full_table_name = 'ORCHESTRA_DATA.public.' || :target_table;
     
     -- Get task runs data
-    SELECT core.get_task_runs(:api_key, 1000) INTO :task_data;
+    SELECT core.get_task_runs(1000) INTO :task_data;
     
     -- Insert data into target table
     INSERT INTO IDENTIFIER(:full_table_name)
@@ -214,10 +214,10 @@ BEGIN
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE core.load_task_runs_to_table(STRING, STRING) TO APPLICATION ROLE app_public;
+GRANT USAGE ON PROCEDURE core.load_task_runs_to_table(STRING) TO APPLICATION ROLE app_public;
 
 -- Load operations procedure
-CREATE OR REPLACE PROCEDURE core.load_operations_to_table(api_key STRING, target_table STRING)
+CREATE OR REPLACE PROCEDURE core.load_operations_to_table(target_table STRING)
 RETURNS STRING
 LANGUAGE SQL
 AS
@@ -231,7 +231,7 @@ BEGIN
     SET full_table_name = 'ORCHESTRA_DATA.public.' || :target_table;
     
     -- Get operations data
-    SELECT core.get_operations(:api_key) INTO :operation_data;
+    SELECT core.get_operations() INTO :operation_data;
     
     -- Insert data into target table
     INSERT INTO IDENTIFIER(:full_table_name)
@@ -264,7 +264,7 @@ BEGIN
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE core.load_operations_to_table(STRING, STRING) TO APPLICATION ROLE app_public;
+GRANT USAGE ON PROCEDURE core.load_operations_to_table(STRING) TO APPLICATION ROLE app_public;
 
 -- 6. Create validation procedure to check database and schema existence
 CREATE OR REPLACE PROCEDURE core.validate_database_schema()
