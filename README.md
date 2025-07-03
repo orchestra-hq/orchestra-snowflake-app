@@ -62,15 +62,17 @@ SELECT core.get_pipeline_runs();
 The app automatically creates tables in the `<APP_NAME>.PUBLIC` schema. Load data using the built-in procedures:
 
 ```sql
--- Load pipeline runs data
+-- Load pipeline runs data (inserts new or updates existing)
 CALL core.load_pipeline_runs();
 
--- Load task runs data
+-- Load task runs data (inserts new or updates existing)
 CALL core.load_task_runs();
 
--- Load operations data
+-- Load operations data (inserts new or updates existing)
 CALL core.load_operations();
 ```
+
+**Note**: These procedures use MERGE operations to handle existing records. New records are inserted, while existing records (based on ID) are updated with the latest data from the Orchestra API.
 
 ## Usage Examples
 
@@ -125,9 +127,9 @@ FROM TABLE(FLATTEN(input => core.get_pipeline_runs():results));
 
 ### Data Loading
 
-- `core.load_pipeline_runs()` - Load pipeline runs to the public.pipeline_runs table
-- `core.load_task_runs()` - Load task runs to the public.task_runs table
-- `core.load_operations()` - Load operations to the public.operations table
+- `core.load_pipeline_runs()` - Load pipeline runs to the public.pipeline_runs table (inserts new or updates existing)
+- `core.load_task_runs()` - Load task runs to the public.task_runs table (inserts new or updates existing)
+- `core.load_operations()` - Load operations to the public.operations table (inserts new or updates existing)
 
 ### Setup
 
@@ -135,11 +137,11 @@ FROM TABLE(FLATTEN(input => core.get_pipeline_runs():results));
 
 ## Table Schemas
 
-The app automatically creates three tables in the `public` schema:
+The app automatically creates three tables in the `public` schema with primary key constraints and uniqueness constraints:
 
 ### Pipeline Runs Table
 
-- `id` - Unique pipeline run identifier
+- `id` - Unique pipeline run identifier (PRIMARY KEY, NOT NULL, UNIQUE)
 - `pipeline_id` - Pipeline identifier
 - `pipeline_name` - Name of the pipeline
 - `account_id` - Account identifier
@@ -158,7 +160,7 @@ The app automatically creates three tables in the `public` schema:
 
 ### Task Runs Table
 
-- `id` - Unique task run identifier
+- `id` - Unique task run identifier (PRIMARY KEY, NOT NULL, UNIQUE)
 - `pipeline_run_id` - Associated pipeline run
 - `task_name` - Name of the task
 - `task_id` - Task identifier
@@ -183,7 +185,7 @@ The app automatically creates three tables in the `public` schema:
 
 ### Operations Table
 
-- `id` - Unique operation identifier
+- `id` - Unique operation identifier (PRIMARY KEY, NOT NULL, UNIQUE)
 - `account_id` - Account identifier
 - `pipeline_run_id` - Associated pipeline run
 - `task_run_id` - Associated task run

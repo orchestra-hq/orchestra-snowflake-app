@@ -72,13 +72,13 @@ The app automatically creates the following tables in the `public` schema:
 To load data into these tables:
 
 ```sql
--- Load pipeline runs data
+-- Load pipeline runs data (inserts new or updates existing)
 CALL core.load_pipeline_runs();
 
--- Load task runs data
+-- Load task runs data (inserts new or updates existing)
 CALL core.load_task_runs();
 
--- Load operations data
+-- Load operations data (inserts new or updates existing)
 CALL core.load_operations();
 ```
 
@@ -86,8 +86,12 @@ Each procedure will:
 
 1. Fetch the latest data from the Orchestra API
 2. Transform the data to match the table schema
-3. Insert the data into the corresponding table
-4. Return a success message with the number of records loaded
+3. Use MERGE operations to handle existing records:
+   - **New records**: Inserted into the table
+   - **Existing records**: Updated with latest data from the API
+4. Return a success message with the number of records processed
+
+**Note**: These procedures are idempotent - you can run them multiple times safely without creating duplicates or errors.
 
 ### Extract Specific Fields
 
@@ -142,7 +146,7 @@ FROM (SELECT core.get_pipeline_runs() as result);
 
 ### Pipeline Runs Table
 
-- `id` - Unique pipeline run identifier
+- `id` - Unique pipeline run identifier (PRIMARY KEY, NOT NULL, UNIQUE)
 - `pipeline_id` - Pipeline identifier
 - `pipeline_name` - Name of the pipeline
 - `account_id` - Account identifier
@@ -161,7 +165,7 @@ FROM (SELECT core.get_pipeline_runs() as result);
 
 ### Task Runs Table
 
-- `id` - Unique task run identifier
+- `id` - Unique task run identifier (PRIMARY KEY, NOT NULL, UNIQUE)
 - `pipeline_run_id` - Associated pipeline run
 - `task_name` - Name of the task
 - `task_id` - Task identifier
@@ -186,7 +190,7 @@ FROM (SELECT core.get_pipeline_runs() as result);
 
 ### Operations Table
 
-- `id` - Unique operation identifier
+- `id` - Unique operation identifier (PRIMARY KEY, NOT NULL, UNIQUE)
 - `account_id` - Account identifier
 - `pipeline_run_id` - Associated pipeline run
 - `task_run_id` - Associated task run
